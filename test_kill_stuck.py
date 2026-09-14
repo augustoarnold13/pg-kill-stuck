@@ -36,6 +36,18 @@ class ShouldTerminateTest(unittest.TestCase):
             should_terminate(conn(state="idle", query="SELECT 1", query_age_seconds=4000))
         )
 
+    def test_kills_idle_rollback_after_3_minutes(self):
+        self.assertTrue(
+            should_terminate(
+                conn(state="idle", query="ROLLBACK", query_age_seconds=1121)
+            )
+        )
+
+    def test_keeps_idle_rollback_under_3_minutes(self):
+        self.assertFalse(
+            should_terminate(conn(state="idle", query="ROLLBACK", query_age_seconds=179))
+        )
+
     def test_kills_commit_after_3_minutes(self):
         self.assertTrue(
             should_terminate(conn(query="COMMIT", query_age_seconds=181, xact_age_seconds=181))

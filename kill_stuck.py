@@ -2,7 +2,7 @@
 """Encerra conexoes PostgreSQL travadas.
 
 Regras:
-  - COMMIT/ROLLBACK ativos ha mais de 3 minutos: termina
+  - COMMIT/ROLLBACK ha mais de 3 minutos: termina (inclusive se o painel mostrar idle)
   - idle in transaction parada ha mais de 3 minutos (sem query nova): termina
   - qualquer outra query ativa ha mais de 5 minutos: termina
   - transacao longa com queries recentes nao e encerrada
@@ -67,14 +67,15 @@ def should_terminate(conn: Connection) -> bool:
         return False
     if conn.backend_type and conn.backend_type != "client backend":
         return False
-    if not conn.state or conn.state == "idle":
-        return False
 
     query_age = conn.query_age_seconds or 0
     state_age = conn.state_age_seconds or 0
 
     if is_commit_or_rollback(conn.query):
         return query_age >= COMMIT_ROLLBACK_SECONDS
+
+    if not conn.state or conn.state == "idle":
+        return False
 
     if conn.state.startswith("idle in transaction"):
         return state_age >= COMMIT_ROLLBACK_SECONDS
