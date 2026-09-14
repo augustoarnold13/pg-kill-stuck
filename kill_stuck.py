@@ -4,7 +4,7 @@
 Regras:
   - COMMIT/ROLLBACK ha mais de 3 minutos: termina (inclusive se o painel mostrar idle)
   - idle in transaction parada ha mais de 3 minutos (sem query nova): termina
-  - qualquer outra query ativa ha mais de 5 minutos: termina
+  - qualquer outra query ativa ha mais de 3 minutos: termina
   - transacao longa com queries recentes nao e encerrada
   - conexoes idle (sem transacao aberta) nao sao encerradas
   - nunca encerra o proprio backend nem workers internos
@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 COMMIT_ROLLBACK_SECONDS = 3 * 60
-OTHER_ACTIVE_SECONDS = 5 * 60
+OTHER_ACTIVE_SECONDS = 3 * 60
 
 COMMIT_ROLLBACK_PREFIXES = ("COMMIT", "ROLLBACK", "ABORT", "END")
 

@@ -65,14 +65,14 @@ class ShouldTerminateTest(unittest.TestCase):
             )
         )
 
-    def test_kills_other_active_query_after_5_minutes(self):
+    def test_kills_other_active_query_after_3_minutes(self):
         self.assertTrue(
-            should_terminate(conn(query="SELECT * FROM heavy", query_age_seconds=301))
+            should_terminate(conn(query="SELECT * FROM heavy", query_age_seconds=181))
         )
 
-    def test_keeps_other_active_query_under_5_minutes(self):
+    def test_keeps_other_active_query_under_3_minutes(self):
         self.assertFalse(
-            should_terminate(conn(query="SELECT * FROM heavy", query_age_seconds=299))
+            should_terminate(conn(query="SELECT * FROM heavy", query_age_seconds=179))
         )
 
     def test_kills_idle_in_transaction_after_3_minutes_idle(self):
