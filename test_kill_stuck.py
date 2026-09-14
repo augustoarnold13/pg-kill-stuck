@@ -15,6 +15,7 @@ def conn(**overrides):
         "query": "SELECT 1",
         "query_age_seconds": 10,
         "xact_age_seconds": 10,
+        "state_age_seconds": 10,
         "is_self": False,
     }
     data.update(overrides)
@@ -62,7 +63,7 @@ class ShouldTerminateTest(unittest.TestCase):
             should_terminate(conn(query="SELECT * FROM heavy", query_age_seconds=299))
         )
 
-    def test_kills_idle_in_transaction_after_3_minutes(self):
+    def test_kills_idle_in_transaction_after_3_minutes_idle(self):
         self.assertTrue(
             should_terminate(
                 conn(
@@ -70,11 +71,12 @@ class ShouldTerminateTest(unittest.TestCase):
                     query="UPDATE users SET name = 'x'",
                     query_age_seconds=10,
                     xact_age_seconds=181,
+                    state_age_seconds=181,
                 )
             )
         )
 
-    def test_keeps_idle_in_transaction_under_3_minutes(self):
+    def test_keeps_idle_in_transaction_under_3_minutes_idle(self):
         self.assertFalse(
             should_terminate(
                 conn(
@@ -82,6 +84,20 @@ class ShouldTerminateTest(unittest.TestCase):
                     query="UPDATE users SET name = 'x'",
                     query_age_seconds=10,
                     xact_age_seconds=179,
+                    state_age_seconds=179,
+                )
+            )
+        )
+
+    def test_keeps_long_transaction_with_recent_queries(self):
+        self.assertFalse(
+            should_terminate(
+                conn(
+                    state="idle in transaction",
+                    query="SELECT user_plans.id AS user_plans_id",
+                    query_age_seconds=0.15,
+                    xact_age_seconds=12 * 60,
+                    state_age_seconds=0.15,
                 )
             )
         )
@@ -93,6 +109,7 @@ class ShouldTerminateTest(unittest.TestCase):
                     state="idle in transaction (aborted)",
                     query="INSERT INTO t VALUES (1)",
                     xact_age_seconds=180,
+                    state_age_seconds=180,
                 )
             )
         )

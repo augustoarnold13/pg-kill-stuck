@@ -3,8 +3,9 @@
 
 Regras:
   - COMMIT/ROLLBACK ativos ha mais de 3 minutos: termina
-  - idle in transaction (parada) ha mais de 3 minutos: termina
+  - idle in transaction parada ha mais de 3 minutos (sem query nova): termina
   - qualquer outra query ativa ha mais de 5 minutos: termina
+  - transacao longa com queries recentes nao e encerrada
   - conexoes idle (sem transacao aberta) nao sao encerradas
   - nunca encerra o proprio backend nem workers internos
 
@@ -39,6 +40,7 @@ class Connection:
     query: str | None
     query_age_seconds: float | None
     xact_age_seconds: float | None
+    state_age_seconds: float | None = None
     is_self: bool = False
 
 
@@ -69,13 +71,13 @@ def should_terminate(conn: Connection) -> bool:
         return False
 
     query_age = conn.query_age_seconds or 0
-    xact_age = conn.xact_age_seconds or query_age
+    state_age = conn.state_age_seconds or 0
 
     if is_commit_or_rollback(conn.query):
         return query_age >= COMMIT_ROLLBACK_SECONDS
 
     if conn.state.startswith("idle in transaction"):
-        return xact_age >= COMMIT_ROLLBACK_SECONDS
+        return state_age >= COMMIT_ROLLBACK_SECONDS
 
     if conn.state == "active":
         return query_age >= OTHER_ACTIVE_SECONDS
@@ -127,6 +129,7 @@ def fetch_connections(cursor) -> list[Connection]:
             query,
             EXTRACT(EPOCH FROM (now() - query_start)) AS query_age_seconds,
             EXTRACT(EPOCH FROM (now() - xact_start)) AS xact_age_seconds,
+            EXTRACT(EPOCH FROM (now() - state_change)) AS state_age_seconds,
             pid = pg_backend_pid() AS is_self
         FROM pg_stat_activity
         """
@@ -145,7 +148,8 @@ def fetch_connections(cursor) -> list[Connection]:
                 query=row[7],
                 query_age_seconds=row[8],
                 xact_age_seconds=row[9],
-                is_self=bool(row[10]),
+                state_age_seconds=row[10],
+                is_self=bool(row[11]),
             )
         )
     return rows
@@ -174,10 +178,16 @@ def format_age(seconds: float | None) -> str:
 
 
 def describe(conn: Connection) -> str:
-    age = conn.xact_age_seconds if conn.state and conn.state.startswith("idle in transaction") else conn.query_age_seconds
+    if conn.state and conn.state.startswith("idle in transaction"):
+        age = conn.state_age_seconds
+        age_label = "idle_for"
+    else:
+        age = conn.query_age_seconds
+        age_label = "query_age"
     return (
         f"pid={conn.pid} db={conn.datname} app={conn.application_name} "
-        f"state={conn.state} age={format_age(age)} query={format_query(conn.query)!r}"
+        f"state={conn.state} {age_label}={format_age(age)} "
+        f"xact_age={format_age(conn.xact_age_seconds)} query={format_query(conn.query)!r}"
     )
 
 
