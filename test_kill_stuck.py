@@ -31,9 +31,14 @@ class ShouldTerminateTest(unittest.TestCase):
             should_terminate(conn(backend_type="autovacuum worker", query_age_seconds=600))
         )
 
-    def test_keeps_idle_connections(self):
+    def test_keeps_idle_select_under_5_minutes(self):
         self.assertFalse(
-            should_terminate(conn(state="idle", query="SELECT 1", query_age_seconds=4000))
+            should_terminate(conn(state="idle", query="SELECT 1", query_age_seconds=299))
+        )
+
+    def test_kills_idle_select_after_5_minutes(self):
+        self.assertTrue(
+            should_terminate(conn(state="idle", query="SELECT 1", query_age_seconds=1772))
         )
 
     def test_kills_idle_rollback_after_3_minutes(self):

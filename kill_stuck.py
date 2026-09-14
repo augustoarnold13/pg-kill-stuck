@@ -5,8 +5,8 @@ Regras:
   - COMMIT/ROLLBACK ha mais de 3 minutos: termina (inclusive se o painel mostrar idle)
   - idle in transaction parada ha mais de 3 minutos (sem query nova): termina
   - qualquer outra query ativa ha mais de 3 minutos: termina
+  - conexoes idle (SELECT 1, pool, etc.) ha mais de 5 minutos: termina
   - transacao longa com queries recentes nao e encerrada
-  - conexoes idle (sem transacao aberta) nao sao encerradas
   - nunca encerra o proprio backend nem workers internos
 
 Uso:
@@ -24,6 +24,7 @@ from pathlib import Path
 
 COMMIT_ROLLBACK_SECONDS = 3 * 60
 OTHER_ACTIVE_SECONDS = 3 * 60
+IDLE_OTHER_SECONDS = 5 * 60
 
 COMMIT_ROLLBACK_PREFIXES = ("COMMIT", "ROLLBACK", "ABORT", "END")
 
@@ -75,7 +76,7 @@ def should_terminate(conn: Connection) -> bool:
         return query_age >= COMMIT_ROLLBACK_SECONDS
 
     if not conn.state or conn.state == "idle":
-        return False
+        return query_age >= IDLE_OTHER_SECONDS
 
     if conn.state.startswith("idle in transaction"):
         return state_age >= COMMIT_ROLLBACK_SECONDS
